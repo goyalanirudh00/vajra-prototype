@@ -11,16 +11,27 @@ A futuristic-elegant, tech-minimal forecasting platform that demonstrates anomal
 pip install -r requirements.txt
 ```
 
-2. Set up OpenAI API key (required for LLM features):
-   - Option 1: Create `.streamlit/secrets.toml` file with:
-     ```toml
-     OPENAI_API_KEY = "your-api-key-here"
-     ```
-   - Option 2: Set environment variable:
-     ```bash
-     export OPENAI_API_KEY="your-api-key-here"
-     ```
-   - Note: If no API key is provided, the app will use fallback mock data
+2. Set up API keys:
+   - **OpenAI API Key** (required for LLM features):
+     - Option 1: Create `.streamlit/secrets.toml` file with:
+       ```toml
+       OPENAI_API_KEY = "your-api-key-here"
+       ```
+     - Option 2: Set environment variable:
+       ```bash
+       export OPENAI_API_KEY="your-api-key-here"
+       ```
+   - **OpenWeatherMap API Key** (required for real-time weather data):
+     - Get a free API key from: https://openweathermap.org/api
+     - Option 1: Add to `.streamlit/secrets.toml`:
+       ```toml
+       OPENWEATHER_API_KEY = "your-openweather-api-key-here"
+       ```
+     - Option 2: Set environment variable:
+       ```bash
+       export OPENWEATHER_API_KEY="your-openweather-api-key-here"
+       ```
+   - Note: If API keys are not provided, the app will use fallback mock data
 
 3. Run the app:
 ```bash
@@ -32,7 +43,9 @@ streamlit run app.py
 ## ✨ Features
 
 - **AI-Powered SKU Generation**: GPT-4o-mini generates realistic, retailer-specific SKUs
-- **Location-Specific Anomalies**: Highly personalized weather anomalies with local references (neighborhoods, ZIP codes, landmarks)
+- **Real-Time Weather Integration**: Uses OpenWeatherMap API to fetch live weather data and detect anomalies
+- **Anomaly Detection Model**: Simple threshold-based model that identifies severe weather conditions (high winds, heavy rain, extreme temperatures, low visibility)
+- **Location-Specific Anomalies**: Highly personalized weather anomalies with local references (neighborhoods, ZIP codes, landmarks) based on real weather data
 - **Anomaly-Aware Forecasting**: Vajra forecast (intelligent) vs. generic moving average
 - **Cost Analysis**: Tail-loss multipliers with accuracy and savings metrics
 - **Actionable Recommendations**: Context-aware, locality-specific recommendations
