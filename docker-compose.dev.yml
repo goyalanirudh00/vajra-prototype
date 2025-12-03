@@ -1,0 +1,33 @@
+version: '3.8'
+
+# Development version with hot-reload enabled
+# Use this for active development: docker-compose -f docker-compose.dev.yml up
+
+services:
+  vajra-app:
+    build: .
+    container_name: vajra-prototype-dev
+    ports:
+      - "8501:8501"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY}
+    volumes:
+      # Mount ALL code files for live development
+      # Changes to these files will be picked up by Streamlit automatically
+      - ./app.py:/app/app.py
+      - ./metrics.py:/app/metrics.py
+      - ./weather_api.py:/app/weather_api.py
+      # Mount database directory for persistence
+      - ./data:/app/data
+    # Override command to enable file watching (Streamlit auto-reloads by default)
+    command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.fileWatcherType=poll
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+

@@ -48,13 +48,14 @@ def get_openweather_api_key() -> Optional[str]:
 def geocode_location(location: str, api_key: str) -> Optional[Dict]:
     """
     Geocode a location name to get coordinates using OpenWeatherMap Geocoding API.
+    Restricted to USA only.
     Returns: {lat, lon, name, country} or None
     """
     try:
         url = "http://api.openweathermap.org/geo/1.0/direct"
         params = {
             "q": location,
-            "limit": 1,
+            "limit": 5,
             "appid": api_key
         }
         response = requests.get(url, params=params, timeout=10)
@@ -62,12 +63,25 @@ def geocode_location(location: str, api_key: str) -> Optional[Dict]:
         data = response.json()
         
         if data and len(data) > 0:
+            # Filter to USA only
+            usa_results = [r for r in data if r.get("country") == "US"]
+            
+            if not usa_results:
+                # If no USA results, check if any results exist and warn
+                if data:
+                    countries = set(r.get("country", "") for r in data if r.get("country"))
+                    print(f"Warning: Location '{location}' not found in USA. Found matches in: {countries}")
+                return None
+            
+            # Use the first USA result
+            result = usa_results[0]
+            
             return {
-                "lat": data[0]["lat"],
-                "lon": data[0]["lon"],
-                "name": data[0].get("name", location),
-                "country": data[0].get("country", ""),
-                "state": data[0].get("state", "")
+                "lat": result["lat"],
+                "lon": result["lon"],
+                "name": result.get("name", location),
+                "country": result.get("country", ""),
+                "state": result.get("state", "")
             }
     except Exception as e:
         print(f"Geocoding error for {location}: {e}")

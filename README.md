@@ -1,120 +1,67 @@
 # Vajra Prototype
 
-**Weather & Disruption Intelligence Layer for Food Delivery Operations**
+Weather & Disruption Intelligence Layer for Food Delivery Operations
 
-A futuristic-elegant, tech-minimal forecasting platform that demonstrates anomaly-aware demand forecasting using AI-powered predictions.
+A forecasting platform that demonstrates anomaly-aware demand forecasting using AI-powered predictions.
 
-## 🚀 Quick Start
+## Quick Start
 
 1. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Set up API keys:
-   - **OpenAI API Key** (required for LLM features):
-     - Option 1: Create `.streamlit/secrets.toml` file with:
-       ```toml
-       OPENAI_API_KEY = "your-api-key-here"
-       ```
-     - Option 2: Set environment variable:
-       ```bash
-       export OPENAI_API_KEY="your-api-key-here"
-       ```
-   - **OpenWeatherMap API Key** (required for real-time weather data):
-     - Get a free API key from: https://openweathermap.org/api
-     - Option 1: Add to `.streamlit/secrets.toml`:
-       ```toml
-       OPENWEATHER_API_KEY = "your-openweather-api-key-here"
-       ```
-     - Option 2: Set environment variable:
-       ```bash
-       export OPENWEATHER_API_KEY="your-openweather-api-key-here"
-       ```
-   - Note: If API keys are not provided, the app will use fallback mock data
+2. Set up API keys (optional - app works with mock data if not provided):
+   - Create `.streamlit/secrets.toml` or set environment variables:
+     - `OPENAI_API_KEY` - Get from https://platform.openai.com/api-keys
+     - `OPENWEATHER_API_KEY` - Get from https://openweathermap.org/api
+     - `GOOGLE_PLACES_API_KEY` - Get from Google Cloud Console
 
 3. Run the app:
 ```bash
 streamlit run app.py
 ```
 
-4. Open your browser to the URL shown (typically `http://localhost:8501`)
+4. Open `http://localhost:8501` in your browser
 
-## ✨ Features
+## Features
 
-- **AI-Powered SKU Generation**: GPT-4o-mini generates realistic, retailer-specific SKUs
-- **Real-Time Weather Integration**: Uses OpenWeatherMap API to fetch live weather data and detect anomalies
-- **Anomaly Detection Model**: Simple threshold-based model that identifies severe weather conditions (high winds, heavy rain, extreme temperatures, low visibility)
-- **Location-Specific Anomalies**: Highly personalized weather anomalies with local references (neighborhoods, ZIP codes, landmarks) based on real weather data
-- **Anomaly-Aware Forecasting**: Vajra forecast (intelligent) vs. generic moving average
-- **Cost Analysis**: Tail-loss multipliers with accuracy and savings metrics
-- **Actionable Recommendations**: Context-aware, locality-specific recommendations
-- **Brand Design**: Futuristic-elegant UI with Diamond Storm color palette
-- **Three-Tab Interface**: Anomaly Alerts, Forecast Analysis, and Recommendations
+- AI-powered SKU generation using GPT-4o-mini
+- Real-time weather integration with anomaly detection
+- Location-specific weather anomaly predictions
+- Anomaly-aware demand forecasting
+- Cost analysis with accuracy and savings metrics
+- Actionable, location-specific recommendations
 
-## 🎨 Design
+## Usage
 
-- **Color Palette**: Electric Violet (#7F5AF0), Deep Purple (#6438B7), Crystal Blue-Gray (#7A88A1)
-- **Typography**: Space Grotesk (headers), Inter (body), Orbitron (logo)
-- **Aesthetic**: Clean, minimal, modern with geometric precision
+1. Enter a retailer name (e.g., "Target", "Whole Foods")
+2. Enter an area/city/zip code (e.g., "San Jose", "94102")
+3. Click "Evaluate Forecast"
+4. View results in three tabs: Anomaly Alerts, Forecast Analysis, and Recommendations
 
-## 📖 Usage
+## Documentation
 
-1. Enter a **Retailer Name** (e.g., "Target", "Whole Foods", "Walmart")
-2. Enter an **Area / City / Pin Code** (e.g., "San Jose", "Chicago", "94102")
-3. Click **Evaluate Forecast** button
-4. View results in three tabs:
-   - **Anomaly Alerts**: Detected weather anomalies with locality-specific details
-   - **Forecast Analysis**: Interactive chart and accuracy/savings comparison
-   - **Recommendations**: Actionable, location-specific recommendations
+Detailed guides are in the [`docs/`](./docs/) folder:
 
-## 🌐 Deployment
+- [Development Guide](./docs/DEV_GUIDE.md) - Local development with Docker
+- [Secrets Management](./docs/SECRETS_GUIDE.md) - Managing API keys
+- [Container Deployment](./docs/CONTAINER_DEPLOYMENT.md) - Docker deployment
+- [Deployment Options](./docs/DEPLOYMENT.md) - Streamlit Cloud and other platforms
+- [Production Checklist](./docs/PRODUCTION_CHECKLIST.md) - Production readiness
+- [Metrics System](./docs/METRICS.md) - Metrics tracking
 
-### Streamlit Cloud (Recommended)
+## Deployment
 
-1. Push this repository to GitHub
-2. Go to [share.streamlit.io](https://share.streamlit.io)
-3. Sign in with GitHub
-4. Click "New app"
-5. Select your repository and set:
-   - **Main file path**: `app.py`
-   - **Python version**: 3.9+
-6. Add your OpenAI API key in the "Secrets" section:
-   ```toml
-   OPENAI_API_KEY = "your-api-key-here"
-   ```
-7. Click "Deploy"
+**Streamlit Cloud**: Push to GitHub and deploy on [share.streamlit.io](https://share.streamlit.io)
 
-### Local Deployment
+**Docker**: See [Container Deployment Guide](./docs/CONTAINER_DEPLOYMENT.md) for Railway, Render, Fly.io, etc.
 
-See Quick Start section above.
+**Local Development**: See [Development Guide](./docs/DEV_GUIDE.md) for Docker setup
 
-## 🔮 Future Extensions
+## Technical Details
 
-- **Multi-store Comparison**: Compare forecasts across multiple locations
-- **Live Data Integration**: Connect to real-time demand and weather APIs
-- **Advanced Forecasting**: Machine learning models for demand prediction
-- **Historical Analysis**: Compare forecasts against historical anomalies
-
-## LLM Integration
-
-The app now uses **OpenAI GPT-4o-mini** for intelligent predictions:
-
-- **SKU Generation**: Generates realistic, retailer-specific SKUs based on product mix
-- **Weather Anomaly Prediction**: Predicts location-specific weather anomalies for September-November
-- **Recommendations**: Provides actionable, context-aware recommendations for each SKU-anomaly combination
-
-### API Key Setup
-
-The app requires an OpenAI API key. It will:
-1. Check Streamlit secrets (`.streamlit/secrets.toml`)
-2. Fall back to `OPENAI_API_KEY` environment variable
-3. Use mock data if no API key is found
-
-### Cost Efficiency
-
-- Uses **GPT-4o-mini** model (cost-effective, high quality)
+- Uses OpenAI GPT-4o-mini for SKU generation and anomaly predictions
+- API key lookup order: Streamlit secrets → environment variables → mock data fallback
 - Responses are cached to minimize API calls
-- Automatic fallback to mock data if API fails
-
-
+- SQLite database for metrics tracking

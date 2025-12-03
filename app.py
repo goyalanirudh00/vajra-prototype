@@ -497,10 +497,10 @@ def render_sidebar() -> Dict:
     )
     
     area = st.sidebar.text_input(
-        "Area / City / Pin Code",
+        "Area / City / ZIP Code",
         value="",
-        placeholder="Enter area, city, or pin code",
-        help="Examples: New York, Mumbai, 10001"
+        placeholder="Enter area, city, or ZIP code",
+        help="Examples: New York, San Francisco, 10001, 90210"
     )
     
     st.sidebar.markdown("---")
@@ -761,10 +761,12 @@ Return ONLY valid JSON format, no other text."""
         visibility_km = current.get("visibility", 10)
         weather_desc = current.get("weather_description", "")
         
-        # Get current date and calculate timeline
+        # Get current date and calculate timeline (ensure at least 1 day in advance)
         current_date = datetime.now()
-        date_str = current_date.strftime("%B %d")
-        next_date_str = (current_date + timedelta(days=1)).strftime("%B %d")
+        # Anomaly should be at least 1 day in the future
+        anomaly_start_date = current_date + timedelta(days=1)
+        date_str = anomaly_start_date.strftime("%B %d")
+        next_date_str = (anomaly_start_date + timedelta(days=1)).strftime("%B %d")
         
         user_prompt = f"""Analyze the real-time weather data for {area} and create a detailed, personalized anomaly alert.
 
@@ -844,6 +846,10 @@ Return ONLY JSON, no markdown."""
             
             if upcoming_severe:
                 forecast_date_obj = datetime.fromtimestamp(severe_forecast_item.get("dt", 0)) if severe_forecast_item else datetime.now()
+                # Ensure forecast date is at least 1 day in the future
+                current_date = datetime.now()
+                if forecast_date_obj <= current_date:
+                    forecast_date_obj = current_date + timedelta(days=1)
                 forecast_date_str = forecast_date_obj.strftime("%B %d")
                 forecast_next_date_str = (forecast_date_obj + timedelta(days=1)).strftime("%B %d")
                 
@@ -874,13 +880,30 @@ Make it personalized to {area} with specific neighborhoods and ZIP codes.
 Return ONLY JSON, no markdown."""
             else:
                 # No severe weather - use historical pattern for Sept-Nov
-                # Use a typical date in the target month
+                # Use a typical date in the target month, ensuring at least 1 day in the future
+                current_date = datetime.now()
+                current_day = current_date.day
+                # Calculate day that's at least 1 day in the future
+                future_day = 15 + (current_day % 15)
+                if future_day <= current_day and target_month == current_date.month:
+                    future_day = current_day + 1
+                    # If day exceeds month length, move to next month
+                    if target_month == 9 and future_day > 30:
+                        future_day = 1
+                        target_month = 10
+                    elif target_month == 10 and future_day > 31:
+                        future_day = 1
+                        target_month = 11
+                    elif target_month == 11 and future_day > 30:
+                        future_day = 1
+                        target_month = 12
+                
                 if target_month == 9:
-                    anomaly_date = f"September {15 + (datetime.now().day % 15)}"
+                    anomaly_date = f"September {future_day}"
                 elif target_month == 10:
-                    anomaly_date = f"October {15 + (datetime.now().day % 15)}"
+                    anomaly_date = f"October {future_day}"
                 else:
-                    anomaly_date = f"November {15 + (datetime.now().day % 15)}"
+                    anomaly_date = f"November {future_day}"
                 
                 user_prompt = f"""Based on historical patterns for {area}, predict a likely weather anomaly for September-November period.
 
@@ -909,21 +932,44 @@ Make it personalized to {area} with specific neighborhoods and ZIP codes.
 Return ONLY JSON, no markdown."""
         else:
             # Fallback: no weather data available
-            current_month = datetime.now().month
+            current_date = datetime.now()
+            current_month = current_date.month
+            current_day = current_date.day
+            # Calculate day that's at least 1 day in the future
+            future_day = 15 + (current_day % 15)
+            
             if current_month < 9:
                 target_month = 9
-                anomaly_date = f"September {15 + (datetime.now().day % 15)}"
+                # If we're in a month before September, future_day will be in September
+                anomaly_date = f"September {future_day}"
             elif current_month > 11:
                 target_month = 11
-                anomaly_date = f"November {15 + (datetime.now().day % 15)}"
+                # If we're past November, use November with future day
+                if future_day > 30:
+                    future_day = 1
+                anomaly_date = f"November {future_day}"
             else:
                 target_month = current_month
+                # Ensure future_day is at least 1 day ahead
+                if future_day <= current_day:
+                    future_day = current_day + 1
+                    # Handle month overflow
+                    if target_month == 9 and future_day > 30:
+                        future_day = 1
+                        target_month = 10
+                    elif target_month == 10 and future_day > 31:
+                        future_day = 1
+                        target_month = 11
+                    elif target_month == 11 and future_day > 30:
+                        future_day = 1
+                        target_month = 12
+                
                 if target_month == 9:
-                    anomaly_date = f"September {15 + (datetime.now().day % 15)}"
+                    anomaly_date = f"September {future_day}"
                 elif target_month == 10:
-                    anomaly_date = f"October {15 + (datetime.now().day % 15)}"
+                    anomaly_date = f"October {future_day}"
                 else:
-                    anomaly_date = f"November {15 + (datetime.now().day % 15)}"
+                    anomaly_date = f"November {future_day}"
             
             user_prompt = f"""Predict a realistic weather anomaly for {area} based on typical weather patterns.
 
@@ -992,10 +1038,136 @@ Return ONLY JSON, no markdown."""
         st.info(f"Using fallback anomaly data for {area}. LLM call failed or API key not configured.")
     return mock_llm_anomaly(area)
 
+def extract_and_correct_anomaly_date(anomaly: Dict) -> str:
+    """
+    Extract date from anomaly and ensure it's at least 1 day in the future.
+    Returns a date string in format "Month Day" (e.g., "December 4").
+    """
+    import re
+    current_date = datetime.now()
+    month_names = ["", "January", "February", "March", "April", "May", "June", 
+                   "July", "August", "September", "October", "November", "December"]
+    
+    anomaly_type = anomaly.get('type', '')
+    base_month_index = anomaly.get('base_month_index', 10)
+    
+    # Try to extract date from anomaly type (e.g., "Heavy Monsoon Rains - November 15")
+    date_match = re.search(r'[-–]\s*(\w+)\s+(\d{1,2})', anomaly_type)
+    if not date_match:
+        # Try without dash separator
+        date_match = re.search(r'(\w+)\s+(\d{1,2})(?:\s|$)', anomaly_type)
+    
+    if date_match:
+        month_name = date_match.group(1)
+        day = int(date_match.group(2))
+        # Find month index
+        month_index = None
+        for i, m in enumerate(month_names):
+            if m and m.lower().startswith(month_name.lower()):
+                month_index = i
+                break
+        if month_index:
+            # Ensure date is at least 1 day in the future
+            extracted_date = datetime(current_date.year, month_index, day)
+            if extracted_date <= current_date:
+                # Move to at least 1 day in the future
+                extracted_date = current_date + timedelta(days=1)
+                month_index = extracted_date.month
+                day = extracted_date.day
+            return f"{month_names[month_index]} {day}"
+    
+    # Fallback to base_month_index
+    # Calculate a day that's at least 1 day in the future
+    calculated_day = 15 + (current_date.day % 15)
+    
+    # Start with base_month_index, but ensure it's in the future
+    target_month = base_month_index if 1 <= base_month_index <= 12 else 10
+    day = calculated_day
+    
+    # If we're in the same month, ensure day is at least 1 day ahead
+    if target_month == current_date.month:
+        if calculated_day <= current_date.day:
+            day = current_date.day + 1
+    # If target_month is in the past, move to current month or next
+    elif target_month < current_date.month:
+        target_month = current_date.month
+        day = current_date.day + 1
+    
+    # Create date and ensure it's at least 1 day in the future
+    try:
+        extracted_date = datetime(current_date.year, target_month, day)
+    except ValueError:
+        # Handle invalid day (e.g., day 31 in September)
+        # Move to next month
+        if target_month == 12:
+            target_month = 1
+            extracted_date = datetime(current_date.year + 1, target_month, 1)
+        else:
+            target_month += 1
+            extracted_date = datetime(current_date.year, target_month, 1)
+        day = extracted_date.day
+    
+    # Final check: ensure date is at least 1 day in the future
+    if extracted_date <= current_date:
+        extracted_date = current_date + timedelta(days=1)
+        target_month = extracted_date.month
+        day = extracted_date.day
+    
+    anomaly_month = month_names[target_month]
+    return f"{anomaly_month} {day}"
+
+def correct_dates_in_recommendations(recommendations: List[str]) -> List[str]:
+    """
+    Post-process recommendations to replace any past dates with future dates.
+    """
+    import re
+    current_date = datetime.now()
+    month_names = ["", "January", "February", "March", "April", "May", "June", 
+                   "July", "August", "September", "October", "November", "December"]
+    
+    corrected_recommendations = []
+    
+    for rec in recommendations:
+        rec_str = str(rec)
+        # Find all date patterns like "November 17", "September 20", etc.
+        date_pattern = r'(\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}\b)'
+        
+        def replace_date(match):
+            date_str = match.group(1)
+            # Parse the date
+            date_match = re.match(r'(\w+)\s+(\d{1,2})', date_str)
+            if date_match:
+                month_name = date_match.group(1)
+                day = int(date_match.group(2))
+                # Find month index
+                month_index = None
+                for i, m in enumerate(month_names):
+                    if m and m.lower().startswith(month_name.lower()):
+                        month_index = i
+                        break
+                if month_index:
+                    # Check if date is in the past
+                    extracted_date = datetime(current_date.year, month_index, day)
+                    if extracted_date <= current_date:
+                        # Replace with a future date (at least 1 day ahead)
+                        future_date = current_date + timedelta(days=1)
+                        return f"{month_names[future_date.month]} {future_date.day}"
+            return date_str
+        
+        # Replace all past dates
+        corrected_rec = re.sub(date_pattern, replace_date, rec_str)
+        corrected_recommendations.append(corrected_rec)
+    
+    return corrected_recommendations
+
 def llm_recommendations(sku: Dict, anomaly: Dict) -> List[str]:
     """
     Generate 3 actionable recommendations based on SKU and anomaly using LLM.
+    Ensures all dates in recommendations are at least 1 day in the future.
     """
+    # Extract and correct the anomaly date to ensure it's in the future
+    corrected_date = extract_and_correct_anomaly_date(anomaly)
+    
     system_prompt = """You are an operations expert for food delivery companies.
 Generate extremely specific, actionable recommendations for managing inventory and operations during weather anomalies.
 Recommendations must be highly detailed, measurable, and directly address the anomaly's impact on the specific SKU type.
@@ -1015,6 +1187,7 @@ Anomaly Type: {anomaly.get('type', 'Unknown')}
 Description: {anomaly.get('description', 'Unknown')}
 Impact: {anomaly.get('impact_pct', 0)}%
 Direction: {anomaly.get('direction', 'cliff')}
+Anomaly Date: {corrected_date}
 """
     
     user_prompt = f"""Provide exactly 3 top recommendations to protect against the cited anomaly.
@@ -1028,6 +1201,7 @@ CRITICAL: Make recommendations feel personalized and delightful:
 - Mention local landmarks, routes, or infrastructure from the anomaly description
 - Use exact location names, ZIP codes, or area references from the anomaly description
 - Ensure recommendations are logically consistent with the anomaly's impact and technical details
+- IMPORTANT: Use the Anomaly Date ({corrected_date}) or dates AFTER {corrected_date} in your recommendations. Do NOT use dates in the past.
 
 Each recommendation must:
 - Be one complete, concise sentence
@@ -1036,11 +1210,12 @@ Each recommendation must:
 - Address SKU characteristics (perishable, frozen, organic, etc.) when relevant
 - Be logically consistent with the anomaly's impact (e.g., if anomaly mentions 4-6 hour delays, recommendations should address that)
 - Feel actionable and practical
+- Use dates that are at least {corrected_date} or later (never use past dates)
 
 Return as JSON array of exactly 3 recommendation strings. Each string is one complete sentence.
 
 Example format:
-["Increase inventory by 25% in ZIP codes 380015 and 380051 by September 20 to account for 4-6 hour delivery delays", "Redirect deliveries from SG Highway to alternative routes through Satellite and Bopal areas during September 22-24", "Pre-position perishable items in temperature-controlled storage facilities near Vastrapur to minimize spoilage during warehouse access restrictions"]
+["Increase inventory by 25% in ZIP codes 10001 and 10002 by {corrected_date} to account for 4-6 hour delivery delays", "Redirect deliveries from I-95 to alternative routes through Brooklyn and Queens during {corrected_date}", "Pre-position perishable items in temperature-controlled storage facilities near Manhattan to minimize spoilage during warehouse access restrictions"]
 
 Return ONLY JSON array, no markdown."""
     
@@ -1056,6 +1231,8 @@ Return ONLY JSON array, no markdown."""
             
             recommendations = json.loads(response)
             if isinstance(recommendations, list):
+                # Post-process to ensure all dates are in the future
+                recommendations = correct_dates_in_recommendations(recommendations)
                 # Ensure we have exactly 3 recommendations
                 if len(recommendations) >= 3:
                     return recommendations[:3]
@@ -1809,19 +1986,48 @@ def render_anomaly_alerts_page(anomaly: Dict, area: str):
                 month_index = i
                 break
         if month_index:
+            # Ensure date is at least 1 day in the future
+            extracted_date = datetime(current_date.year, month_index, day)
+            if extracted_date <= current_date:
+                # Move to at least 1 day in the future
+                extracted_date = current_date + timedelta(days=1)
+                month_index = extracted_date.month
+                day = extracted_date.day
             timeline_start = f"{month_names[month_index]} {day}"
             timeline_end = f"{month_names[month_index]} {day + 1}"
             timeline_display = f"{timeline_start} - {timeline_end}"
         else:
             # Fallback to base_month_index
             anomaly_month = month_names[base_month_index] if 1 <= base_month_index <= 12 else "October"
+            # Ensure day is at least 1 day in the future
+            extracted_date = datetime(current_date.year, base_month_index, day)
+            if extracted_date <= current_date:
+                extracted_date = current_date + timedelta(days=1)
+                base_month_index = extracted_date.month
+                day = extracted_date.day
+                anomaly_month = month_names[base_month_index]
             timeline_start = f"{anomaly_month} {day}"
             timeline_end = f"{anomaly_month} {day + 1}"
             timeline_display = f"{timeline_start} - {timeline_end}"
     else:
         # No date in type, use base_month_index
         anomaly_month = month_names[base_month_index] if 1 <= base_month_index <= 12 else "October"
-        day = 15 + (current_date.day % 15)
+        # Ensure day is at least 1 day in the future
+        calculated_day = 15 + (current_date.day % 15)
+        if calculated_day <= current_date.day and base_month_index == current_date.month:
+            day = current_date.day + 1
+            # Handle month overflow
+            if base_month_index == 9 and day > 30:
+                day = 1
+                anomaly_month = "October"
+            elif base_month_index == 10 and day > 31:
+                day = 1
+                anomaly_month = "November"
+            elif base_month_index == 11 and day > 30:
+                day = 1
+                anomaly_month = "December"
+        else:
+            day = calculated_day
         timeline_start = f"{anomaly_month} {day}"
         timeline_end = f"{anomaly_month} {day + 1}"
         timeline_display = f"{timeline_start} - {timeline_end}"
@@ -1980,18 +2186,61 @@ def render_anomaly_alerts_page(anomaly: Dict, area: str):
                     month_index = i
                     break
             if month_index:
+                # Ensure date is at least 1 day in the future
+                extracted_date = datetime(current_date.year, month_index, day)
+                if extracted_date <= current_date:
+                    extracted_date = current_date + timedelta(days=1)
+                    month_index = extracted_date.month
+                    day = extracted_date.day
                 start_date_display = f"{month_names[month_index]} {day}"
             else:
                 anomaly_month = month_names[base_month_index] if 1 <= base_month_index <= 12 else "October"
+                # Ensure date is at least 1 day in the future
+                extracted_date = datetime(current_date.year, base_month_index, day)
+                if extracted_date <= current_date:
+                    extracted_date = current_date + timedelta(days=1)
+                    base_month_index = extracted_date.month
+                    day = extracted_date.day
+                    anomaly_month = month_names[base_month_index]
                 start_date_display = f"{anomaly_month} {day}"
         else:
             anomaly_month = month_names[base_month_index] if 1 <= base_month_index <= 12 else "October"
-            day = 15 + (current_date.day % 15)
+            # Ensure day is at least 1 day in the future
+            calculated_day = 15 + (current_date.day % 15)
+            if calculated_day <= current_date.day and base_month_index == current_date.month:
+                day = current_date.day + 1
+                # Handle month overflow
+                if base_month_index == 9 and day > 30:
+                    day = 1
+                    anomaly_month = "October"
+                elif base_month_index == 10 and day > 31:
+                    day = 1
+                    anomaly_month = "November"
+                elif base_month_index == 11 and day > 30:
+                    day = 1
+                    anomaly_month = "December"
+            else:
+                day = calculated_day
             start_date_display = f"{anomaly_month} {day}"
     else:
         # No date in type, use base_month_index
         anomaly_month = month_names[base_month_index] if 1 <= base_month_index <= 12 else "October"
-        day = 15 + (current_date.day % 15)
+        # Ensure day is at least 1 day in the future
+        calculated_day = 15 + (current_date.day % 15)
+        if calculated_day <= current_date.day and base_month_index == current_date.month:
+            day = current_date.day + 1
+            # Handle month overflow
+            if base_month_index == 9 and day > 30:
+                day = 1
+                anomaly_month = "October"
+            elif base_month_index == 10 and day > 31:
+                day = 1
+                anomaly_month = "November"
+            elif base_month_index == 11 and day > 30:
+                day = 1
+                anomaly_month = "December"
+        else:
+            day = calculated_day
         start_date_display = f"{anomaly_month} {day}"
     
     # Create headline with just start date

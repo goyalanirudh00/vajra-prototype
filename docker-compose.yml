@@ -1,0 +1,28 @@
+version: '3.8'
+
+# Production-ready docker-compose configuration
+# Code is baked into the image (no volume mounts for code files)
+# Use this for: production deployment, final testing, CI/CD
+
+services:
+  vajra-app:
+    build: .
+    container_name: vajra-prototype
+    ports:
+      - "8501:8501"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - GOOGLE_PLACES_API_KEY=${GOOGLE_PLACES_API_KEY}
+    volumes:
+      # Only mount data directory for persistence (not code files)
+      # Code is copied into image during build (see Dockerfile)
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
